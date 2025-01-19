@@ -1,2 +1,116 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+import tkinter as tk
+from threading import Thread
+import time
+from pynput.keyboard import Controller as KeyboardController
+from pynput.mouse import Controller as MouseController, Button
+from pynput import keyboard
+
+
+class AFKBreaker:  # Uygulama ismini "AFK Breaker" olarak değiştirdik
+    def __init__(self, root):
+        self.root = root
+        self.root.title("AFK Breaker")  # Başlık kısmı da "AFK Breaker"
+        self.root.geometry("400x300")
+        self.root.configure(bg="green")
+
+        # Üstte "AFK Breaker" Yazısı
+        self.header_label = tk.Label(root, text="AFK Breaker", fg="white", bg="green", font=("Arial", 16, "bold"))
+        self.header_label.pack(pady=10)
+
+        # Seçenek Durumları
+        self.selected_option = None
+        self.holding = False
+
+        # Mouse ve Klavye Denetleyicileri
+        self.keyboard = KeyboardController()
+        self.mouse = MouseController()
+
+        # Butonlar
+        self.right_click_button = tk.Button(root, text="Sağ Click", bg="red", fg="white", command=lambda: self.select_option("right"))
+        self.right_click_button.place(x=50, y=50, width=100, height=50)
+
+        self.left_click_button = tk.Button(root, text="Sol Click", bg="red", fg="white", command=lambda: self.select_option("left"))
+        self.left_click_button.place(x=150, y=50, width=100, height=50)
+
+        self.space_button = tk.Button(root, text="Space", bg="red", fg="white", command=lambda: self.select_option("space"))
+        self.space_button.place(x=250, y=50, width=100, height=50)
+
+        # Başlat/Bitir Yazısı
+        self.status_label = tk.Label(root, text="Başlatmak için F6'ya bas", fg="white", bg="blue", font=("Arial", 12))
+        self.status_label.place(x=100, y=200)
+
+        # F6 tuşunu dinleyen thread
+        self.listener_thread = Thread(target=self.listen_for_f6, daemon=True)
+        self.listener_thread.start()
+
+    def select_option(self, option):
+        # Önce tüm butonların rengini sıfırla
+        self.reset_buttons()
+
+        # Yeni seçili butonu turuncu yap
+        self.selected_option = option
+        if option == "right":
+            self.right_click_button.config(bg="orange")
+        elif option == "left":
+            self.left_click_button.config(bg="orange")
+        elif option == "space":
+            self.space_button.config(bg="orange")
+
+    def reset_buttons(self):
+        # Butonları tekrar kırmızıya çevir
+        self.right_click_button.config(bg="red")
+        self.left_click_button.config(bg="red")
+        self.space_button.config(bg="red")
+
+    def toggle_hold(self):
+        # Basılı tutma başlat/bitir
+        if self.selected_option is None:
+            self.status_label.config(text="Lütfen önce bir seçenek seçin!", fg="red")
+            return
+
+        self.holding = not self.holding
+        if self.holding:
+            self.status_label.config(text=f"Basılı Tutma Başladı ({self.selected_option})", fg="white")
+            self.start_holding_thread()
+        else:
+            self.status_label.config(text="Basılı Tutma Durduruldu", fg="white")
+
+    def start_holding_thread(self):
+        # Basılı tutma işlemini başlatmak için ayrı bir thread kullanıyoruz
+        thread = Thread(target=self.hold_key, daemon=True)
+        thread.start()
+
+    def hold_key(self):
+        # Seçime göre basılı tutma işlemi
+        if self.selected_option == "right":
+            self.mouse.press(Button.right)  # Sağ click basılı tut
+            while self.holding:
+                time.sleep(0.1)  # Basılı tutmaya devam et
+            self.mouse.release(Button.right)  # Sağ click bırak
+
+        elif self.selected_option == "left":
+            self.mouse.press(Button.left)  # Sol click basılı tut
+            while self.holding:
+                time.sleep(0.1)
+            self.mouse.release(Button.left)  # Sol click bırak
+
+        elif self.selected_option == "space":
+            self.keyboard.press(" ")  # Space tuşunu basılı tut
+            while self.holding:
+                time.sleep(0.1)
+            self.keyboard.release(" ")  # Space tuşunu bırak
+
+    def listen_for_f6(self):
+        # F6 tuşuna basılıp basılmadığını kontrol eden bir dinleyici
+        def on_press(key):
+            if key == keyboard.Key.f6:
+                self.toggle_hold()
+
+        with keyboard.Listener(on_press=on_press) as listener:
+            listener.join()
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = AFKBreaker(root)  # Uygulama ismi "AFK Breaker" olarak değişti
+    root.mainloop()
